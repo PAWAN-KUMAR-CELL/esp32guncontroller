@@ -3,11 +3,12 @@
 
 #define MPU_ADDR 0x68
 #define PIN_SDA 8
-#define PIN_SCL 9
+#define PIN_SCL 9   
 
 #define PIN_TRIGGER 4
 #define PIN_RECAL   5
 #define PIN_EXTRA   6
+#define PIN_CLUTCH  3   // TTP223 touch module signal pin - active HIGH when touched
 
 BleMouse bleMouse("ESP32 Gun", "DIY", 100);
 
@@ -102,6 +103,7 @@ void setup() {
   pinMode(PIN_TRIGGER, INPUT_PULLUP);
   pinMode(PIN_RECAL, INPUT_PULLUP);
   pinMode(PIN_EXTRA, INPUT_PULLUP);
+  pinMode(PIN_CLUTCH, INPUT);   // touch module has its own output driver, no internal pullup needed
 
   Wire.begin(PIN_SDA, PIN_SCL);
   Wire.setClock(100000);
@@ -174,10 +176,13 @@ void loop() {
   rateX = smoothRateX;
   rateY = smoothRateY;
 
-  int mouseX = (int)(-rateX * dt * SENS_X * 10);
-  int mouseY = (int)(rateY * dt * SENS_Y * 10); // invert if aim is upside down
+  int mouseY = (int)(rateX * dt * SENS_X * 10);
+  int mouseX = (int)(rateY * dt * SENS_Y * 10); // invert if aim is upside down
 
-  if (ok && (mouseX != 0 || mouseY != 0)) {
+  // Clutch: hold touch pad to freely reposition the gun without moving the cursor
+  bool clutchHeld = digitalRead(PIN_CLUTCH) == HIGH;
+
+  if (ok && !clutchHeld && (mouseX != 0 || mouseY != 0)) {
     bleMouse.move(mouseX, mouseY, 0);
   }
 
@@ -219,6 +224,7 @@ void loop() {
     Serial.print(" | TRIG="); Serial.print(trig);
     Serial.print(" RECAL="); Serial.print(recal);
     Serial.print(" EXTRA="); Serial.print(extra);
+    Serial.print(" CLUTCH="); Serial.print(clutchHeld);
     Serial.print(" AUTORECAL="); Serial.println(autoRecentered);
     lastStatusPrint = millis();
   }
